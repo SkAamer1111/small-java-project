@@ -1,0 +1,78 @@
+trigger:
+- main
+
+pool:
+  name: ec2-agent-pool
+
+variables:
+  - group: seceret-group
+
+stages:
+
+# ==========================
+# BUILD STAGE
+# ==========================
+- stage: Build
+  displayName: Build and Push Docker Image
+
+  jobs:
+  - job: BuildAndPush
+
+    steps:
+
+    - checkout: self
+
+    - script: |
+        java -version
+        mvn -version
+        docker --version
+      displayName: Verify Tools
+
+    - script: |
+        cd "Small Java Project/java-app/"
+        mvn clean package
+      displayName: 'Maven Build'
+
+    - script: |
+        cd "Small Java Project/java-app/"
+        docker image build -t $(dockerHubUser)/$(imageRepository):$(Build.BuildId) .
+      displayName: Build 
+
+    - script: |
+        echo $(dockerHubPassword) | docker login -u $(dockerHubUser) --password-stdin
+        docker push $(dockerHubUser)/$(imageRepository):$(Build.BuildId)
+      displayName: Login to Docker Hub and Push Image
+
+
+# ==========================
+# DEPLOY STAGE
+# ==========================
+- stage: Deploy
+  displayName: Deploy Application
+  dependsOn: Build
+
+  jobs:
+  - job: Deploy
+
+    steps:
+
+    - script: |
+        echo "Stopping old container..."
+
+        docker stop springboot || true
+        docker rm springboot || true
+
+        echo "Pulling latest image..."
+
+        docker pull $(dockerHubUser)/$(imageRepository):$(Build.BuildId)
+
+        echo "Starting new container..."
+
+        docker run -d \
+          --name springboot \
+          -p 8080:8080 \
+          --restart unless-stopped \
+          $(dockerHubUser)/$(imageRepository):$(Build.BuildId)
+
+        docker ps
+      displayName: Deploy Container
