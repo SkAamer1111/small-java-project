@@ -22,12 +22,29 @@ pipeline{
         }
         stage ('IMAGE BUILD'){
             steps{
-                sh 'docker image build -t app:$BUILD_ID .'
+                sh 'docker image build -t shaikhaamer/jenkins_docker_image:$BUILD_ID .'
+            }
+        }
+        stage ('LOGIN'){
+            steps{
+                withCredentials([usernamePassword(
+                    credentialsId: 'docker_cred'
+                    usernamevariable: 'DOCKER_USER'
+                    passwordVariable: 'DOCKER_PASSWORD'
+                )]){
+                    sh "echo $DOCKER_PASSWORD | docker login -u $DOCKER_USER --password-stdin"
+                }
+            }
+        }
+        stage{
+            steps{
+                sh 'docker push shaikhaamer/jenkins_docker_image:$BUILD_ID'
             }
         }
         stage ('DEPLOY'){
             steps{
-                sh 'docker container run -d --name java-app -p 8081:8080 app:$BUILD_ID'
+                sh 'docker container rm -f java-app'
+                sh 'docker container run -d --name java-app -p 8081:8080 shaikhaamer/jenkins_docker_image:$BUILD_ID'
             }
         }
     }
