@@ -36,7 +36,7 @@ pipeline{
                 }
             }
         }
-        stage('PUSH')){
+        stage('PUSH'){
             steps{
                 sh 'docker push shaikhaamer/jenkins_docker_image:$BUILD_ID'
             }
